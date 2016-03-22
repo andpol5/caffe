@@ -59,6 +59,7 @@ message FillerParameter {
     AVERAGE = 2;
   }
   optional VarianceNorm variance_norm = 8 [default = FAN_IN];
+  optional int32 num_groups = 9; // for identity filler
 }
 
 message NetParameter {
@@ -403,6 +404,10 @@ message LayerParameter {
   optional ThresholdParameter threshold_param = 128;
   optional TileParameter tile_param = 138;
   optional WindowDataParameter window_data_param = 129;
+  optional MultiStageMeanfieldParameter multi_stage_meanfield_param = 1000;
+  optional ImageLabelDataParameter image_label_data_param = 1001;
+  optional FyuImageLabelDataParameter fyu_image_label_data_param = 1005;
+  optional WeightedLossParameter weighted_loss_param = 1006;
 }
 
 // Message that stores parameters used to apply transformation
@@ -453,6 +458,26 @@ message LossParameter {
   // is not specified, then setting this to false will be equivalent to
   // normalization = BATCH_SIZE to be consistent with previous behavior.
   optional bool normalize = 2;
+}
+
+// Message that stores parameters used by MultiStageMeanfieldLayer
+message MultiStageMeanfieldParameter {
+  enum Mode {
+    POTTS = 0;
+  }
+  optional Mode compatibility_mode = 1 [default = POTTS];
+  optional float threshold = 2;
+
+  required float theta_alpha = 3 [default = 10.];
+  required float theta_beta = 4 [default = 10.];
+  required float theta_gamma = 5 [default = 10.];
+
+  required uint32 num_iterations = 6 [default = 1];
+
+  optional string spatial_filter_weights_str = 19 [default=""];
+  optional string bilateral_filter_weights_str = 20 [default=""];
+
+  optional bool force_cpu=29 [default=false];//Force CPU meanfield to use, even though GPU is available
 }
 
 // Messages that store parameters used by individual layer types follow, in
@@ -802,6 +827,82 @@ message ImageDataParameter {
   // data.
   optional bool mirror = 6 [default = false];
   optional string root_folder = 12 [default = ""];
+}
+
+message Slice {
+  repeated uint32 dim = 1;
+  repeated uint32 stride = 2;
+  repeated uint32 offset = 3;
+}
+
+message ImageLabelDataParameter {
+  // Specify the data source.
+  required string image_list_path = 1;
+  required string label_list_path = 2;
+  // Specify the batch size.
+  optional uint32 batch_size = 3 [default = 1];
+  // The rand_skip variable is for the data layer to skip a few data points
+  // to avoid all asynchronous sgd clients to start at the same point. The skip
+  // point would be set as rand_skip * rand(0,1). Note that rand_skip should not
+  // be larger than the number of keys in the database.
+  optional uint32 rand_skip = 4 [default = 0];
+  // Whether or not ImageLayer should shuffle the list of files at every epoch.
+  optional bool shuffle = 5 [default = false];
+
+  optional string image_dir = 6 [default = ""];
+  optional string label_dir = 7 [default = ""];
+
+  // Label background value
+  optional int32 label_background_value = 8 [default = 255];
+
+  // How to pad the image up to the crop size
+  enum Padding {
+    ZERO = 0;
+    REFLECT = 1;
+  }
+
+  optional Padding padding = 9 [default = REFLECT];
+}
+
+message FyuImageLabelDataParameter {
+  // Specify the data source.
+  optional string image_list_path = 1;
+  optional string label_list_path = 2;
+  // Specify the batch size.
+  optional uint32 batch_size = 3 [default = 1];
+  // The rand_skip variable is for the data layer to skip a few data points
+  // to avoid all asynchronous sgd clients to start at the same point. The skip
+  // point would be set as rand_skip * rand(0,1). Note that rand_skip should not
+  // be larger than the number of keys in the database.
+  optional uint32 rand_skip = 4 [default = 0];
+  // Whether or not ImageLayer should shuffle the list of files at every epoch.
+  optional bool shuffle = 5 [default = false];
+
+  // Whether random sample image scales
+  optional bool rand_scale = 6 [default = false];
+  optional float min_scale = 7  [default = 1];
+  optional float max_scale = 8  [default = 1];
+
+  optional string data_dir = 9 [default = ""];
+
+  optional Slice label_slice = 10;
+
+  optional string image_dir = 11 [default = ""];
+  optional string label_dir = 12 [default = ""];
+
+  enum Padding {
+    ZERO = 0;
+    REFLECT = 1;
+  }
+
+  optional Padding padding = 13 [default = REFLECT];
+}
+
+message WeightedLossParameter {
+  // Specify the label values present in the ground truth
+  repeated int32 pixel_label = 1;
+  // If specified, ignore instances with the given label.
+  optional int32 ignore_label = 2;
 }
 
 message InfogainLossParameter {
@@ -1403,3 +1504,4 @@ message PReLUParameter {
   // Whether or not slope paramters are shared across channels.
   optional bool channel_shared = 2 [default = false];
 }
+
