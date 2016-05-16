@@ -59,7 +59,6 @@ message FillerParameter {
     AVERAGE = 2;
   }
   optional VarianceNorm variance_norm = 8 [default = FAN_IN];
-  optional int32 num_groups = 9; // for identity filler
 }
 
 message NetParameter {
@@ -220,7 +219,7 @@ message SolverParameter {
 
   // RMSProp decay value
   // MeanSquare(t) = rms_decay*MeanSquare(t-1) + (1-rms_decay)*SquareGradient(t)
-  optional float rms_decay = 38 [default = 0.99];
+  optional float rms_decay = 38;
 
   // If true, print information about the state of the net that may help with
   // debugging learning problems.
@@ -307,7 +306,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 147 (last added: recurrent_param)
+// LayerParameter next available layer-specific ID: 146 (last added: parameter_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -391,7 +390,6 @@ message LayerParameter {
   optional PowerParameter power_param = 122;
   optional PReLUParameter prelu_param = 131;
   optional PythonParameter python_param = 130;
-  optional RecurrentParameter recurrent_param = 146;
   optional ReductionParameter reduction_param = 136;
   optional ReLUParameter relu_param = 123;
   optional ReshapeParameter reshape_param = 133;
@@ -404,10 +402,6 @@ message LayerParameter {
   optional ThresholdParameter threshold_param = 128;
   optional TileParameter tile_param = 138;
   optional WindowDataParameter window_data_param = 129;
-  optional MultiStageMeanfieldParameter multi_stage_meanfield_param = 1000;
-  optional ImageLabelDataParameter image_label_data_param = 1001;
-  optional FyuImageLabelDataParameter fyu_image_label_data_param = 1005;
-  optional WeightedLossParameter weighted_loss_param = 1006;
 }
 
 // Message that stores parameters used to apply transformation
@@ -460,50 +454,24 @@ message LossParameter {
   optional bool normalize = 2;
 }
 
-// Message that stores parameters used by MultiStageMeanfieldLayer
-message MultiStageMeanfieldParameter {
-  enum Mode {
-    POTTS = 0;
-  }
-  optional Mode compatibility_mode = 1 [default = POTTS];
-  optional float threshold = 2;
-
-  required float theta_alpha = 3 [default = 10.];
-  required float theta_beta = 4 [default = 10.];
-  required float theta_gamma = 5 [default = 10.];
-
-  required uint32 num_iterations = 6 [default = 1];
-
-  optional string spatial_filter_weights_str = 19 [default=""];
-  optional string bilateral_filter_weights_str = 20 [default=""];
-
-  optional bool force_cpu=29 [default=false];//Force CPU meanfield to use, even though GPU is available
-}
-
 // Messages that store parameters used by individual layer types follow, in
 // alphabetical order.
 
 message AccuracyParameter {
-  enum AccuracyType {
-    REC = 0;
-    PRE = 1;
-    JAC = 2;
-  }
-  optional AccuracyType type = 1 [default = REC];
   // When computing accuracy, count as correct by comparing the true label to
   // the top k scoring classes.  By default, only compare to the top scoring
   // class (i.e. argmax).
-  optional uint32 top_k = 2 [default = 1];
+  optional uint32 top_k = 1 [default = 1];
 
   // The "label" axis of the prediction blob, whose argmax corresponds to the
   // predicted label -- may be negative to index from the end (e.g., -1 for the
   // last axis).  For example, if axis == 1 and the predictions are
   // (N x C x H x W), the label blob is expected to contain N*H*W ground truth
   // labels with integer values in {0, 1, ..., C-1}.
-  optional int32 axis = 3 [default = 1];
+  optional int32 axis = 2 [default = 1];
 
   // If specified, ignore instances with the given label.
-  optional int32 ignore_label = 4;
+  optional int32 ignore_label = 3;
 }
 
 message ArgMaxParameter {
@@ -829,82 +797,6 @@ message ImageDataParameter {
   optional string root_folder = 12 [default = ""];
 }
 
-message Slice {
-  repeated uint32 dim = 1;
-  repeated uint32 stride = 2;
-  repeated uint32 offset = 3;
-}
-
-message ImageLabelDataParameter {
-  // Specify the data source.
-  required string image_list_path = 1;
-  required string label_list_path = 2;
-  // Specify the batch size.
-  optional uint32 batch_size = 3 [default = 1];
-  // The rand_skip variable is for the data layer to skip a few data points
-  // to avoid all asynchronous sgd clients to start at the same point. The skip
-  // point would be set as rand_skip * rand(0,1). Note that rand_skip should not
-  // be larger than the number of keys in the database.
-  optional uint32 rand_skip = 4 [default = 0];
-  // Whether or not ImageLayer should shuffle the list of files at every epoch.
-  optional bool shuffle = 5 [default = false];
-
-  optional string image_dir = 6 [default = ""];
-  optional string label_dir = 7 [default = ""];
-
-  // Label background value
-  optional int32 label_background_value = 8 [default = 255];
-
-  // How to pad the image up to the crop size
-  enum Padding {
-    ZERO = 0;
-    REFLECT = 1;
-  }
-
-  optional Padding padding = 9 [default = REFLECT];
-}
-
-message FyuImageLabelDataParameter {
-  // Specify the data source.
-  optional string image_list_path = 1;
-  optional string label_list_path = 2;
-  // Specify the batch size.
-  optional uint32 batch_size = 3 [default = 1];
-  // The rand_skip variable is for the data layer to skip a few data points
-  // to avoid all asynchronous sgd clients to start at the same point. The skip
-  // point would be set as rand_skip * rand(0,1). Note that rand_skip should not
-  // be larger than the number of keys in the database.
-  optional uint32 rand_skip = 4 [default = 0];
-  // Whether or not ImageLayer should shuffle the list of files at every epoch.
-  optional bool shuffle = 5 [default = false];
-
-  // Whether random sample image scales
-  optional bool rand_scale = 6 [default = false];
-  optional float min_scale = 7  [default = 1];
-  optional float max_scale = 8  [default = 1];
-
-  optional string data_dir = 9 [default = ""];
-
-  optional Slice label_slice = 10;
-
-  optional string image_dir = 11 [default = ""];
-  optional string label_dir = 12 [default = ""];
-
-  enum Padding {
-    ZERO = 0;
-    REFLECT = 1;
-  }
-
-  optional Padding padding = 13 [default = REFLECT];
-}
-
-message WeightedLossParameter {
-  // Specify the label values present in the ground truth
-  repeated int32 pixel_label = 1;
-  // If specified, ignore instances with the given label.
-  optional int32 ignore_label = 2;
-}
-
 message InfogainLossParameter {
   // Specify the infogain matrix source.
   optional string source = 1;
@@ -1034,25 +926,6 @@ message PythonParameter {
   // If true, each worker solver sequentially run forward from this layer.
   // This value should be set true if you are using it as a data layer.
   optional bool share_in_parallel = 4 [default = false];
-}
-
-// Message that stores parameters used by RecurrentLayer
-message RecurrentParameter {
-  // The dimension of the output (and usually hidden state) representation --
-  // must be explicitly set to non-zero.
-  optional uint32 num_output = 1 [default = 0];
-
-  optional FillerParameter weight_filler = 2; // The filler for the weight
-  optional FillerParameter bias_filler = 3; // The filler for the bias
-
-  // Whether to enable displaying debug_info in the unrolled recurrent net.
-  optional bool debug_info = 4 [default = false];
-
-  // Whether to add as additional inputs (bottoms) the initial hidden state
-  // blobs, and add as additional outputs (tops) the final timestep hidden state
-  // blobs.  The number of additional bottom/top blobs required depends on the
-  // recurrent architecture -- e.g., 1 for RNNs, 2 for LSTMs.
-  optional bool expose_hidden = 5 [default = false];
 }
 
 // Message that stores parameters used by ReductionLayer
