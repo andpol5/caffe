@@ -1,3 +1,4 @@
+
 #ifndef CAFFE_TVG_COMMON_UTILS_HPP
 #define CAFFE_TVG_COMMON_UTILS_HPP
 
@@ -7,6 +8,7 @@
 namespace tvg {
 
   namespace CommonUtils {
+
 
     template<typename Dtype>
     void read_into_the_diagonal(const std::string & source, caffe::Blob<Dtype> & blob) {
@@ -31,8 +33,9 @@ namespace tvg {
         }
       }
     }
+
   }
 }
 
-#endif //CAFFE_TVG_COMMON_UTILS_HPP
 
+#endif //CAFFE_TVG_COMMON_UTILS_HPP

@@ -284,4 +284,3 @@ void MeanfieldIteration<Dtype>::Backward_cpu() {
 
 INSTANTIATE_CLASS(MeanfieldIteration);
 }  // namespace caffe
-

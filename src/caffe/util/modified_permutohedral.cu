@@ -1,10 +1,9 @@
 #define BLOCK_SIZE 64
 
 #include <stdio.h>
-#include "caffe/util/hash_helper.cuh"
-#include "caffe/util/hash_table.hpp"
-#include "caffe/util/math_functions.hpp"
 #include "caffe/util/modified_permutohedral.hpp"
+#include "caffe/util/hash_helper.cuh"
+#include "caffe/util/math_functions.hpp"
 
 namespace caffe {
 

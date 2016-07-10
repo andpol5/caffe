@@ -162,4 +162,3 @@ namespace caffe {
     template void MeanfieldIteration<float>::Backward_gpu();
     template void MeanfieldIteration<double>::Backward_gpu();
 }  // namespace caffe
-
