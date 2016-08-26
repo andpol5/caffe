@@ -5,7 +5,7 @@
 #include "caffe/layer.hpp"
 #include "caffe/util/im2col.hpp"
 #include "caffe/layers/meanfield_layers.hpp"
- #include "caffe/util/tvg_common_utils.hpp"
+#include "caffe/util/tvg_common_utils.hpp"
 namespace caffe {
 
 /*

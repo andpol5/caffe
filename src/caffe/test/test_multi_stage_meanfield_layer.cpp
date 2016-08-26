@@ -8,13 +8,12 @@
 #include "caffe/blob.hpp"
 #include "caffe/common.hpp"
 #include "caffe/filler.hpp"
-#include "caffe/layers/multi_stage_meanfield.hpp"
+#include "caffe/layers/meanfield_layers.hpp"
 
 #include "caffe/test/test_caffe_main.hpp"
 #include "caffe/test/test_gradient_check_util.hpp"
 
 namespace caffe {
-
 
 template <typename TypeParam>
 class MultiStageMeanfieldLayerTest : public MultiDeviceTest<TypeParam> {
@@ -61,8 +60,8 @@ TYPED_TEST(MultiStageMeanfieldLayerTest, TestGradient) {
   LayerParameter layer_param2;
   MultiStageMeanfieldParameter* ms_mf_param = layer_param2.mutable_multi_stage_meanfield_param();
   ms_mf_param->set_num_iterations(2);
-  ms_mf_param->set_bilateral_filter_weight(1.0);
-  ms_mf_param->set_spatial_filter_weight(1.0);
+  ms_mf_param->set_bilateral_filter_weights_str("1 1 1");
+  ms_mf_param->set_spatial_filter_weights_str("1 1 1");
   ms_mf_param->set_compatibility_mode(MultiStageMeanfieldParameter_Mode_POTTS);
   ms_mf_param->set_theta_alpha(5);
   ms_mf_param->set_theta_beta(2);
@@ -82,4 +81,3 @@ TYPED_TEST(MultiStageMeanfieldLayerTest, TestGradient) {
 }
 
 }  // namespace caffe
-
