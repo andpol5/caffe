@@ -94,4 +94,3 @@ TYPED_TEST(MultiStageMeanfieldLayerTest, TestGradient) {
 }
 
 }  // namespace caffe
-
