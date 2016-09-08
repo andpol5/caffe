@@ -12,7 +12,6 @@ namespace caffe {
     template <typename Dtype>
     void MeanfieldIteration<Dtype>::Forward_gpu() {
 
-
         //------------------------------- Softmax normalization--------------------
         softmax_layer_->Forward(softmax_bottom_vec_, softmax_top_vec_);
 
