@@ -31,8 +31,8 @@ protected:
 		}
 	};
 
-  	// Check if GPU hash table if initialize
-  	bool is_init;
+  // Check if GPU hash table if initialize
+  bool is_init;
 
 	std::vector<int> offset_, rank_;
 	std::vector<float> barycentric_;
@@ -41,7 +41,6 @@ protected:
 	// GPU specific
 	MatrixEntry *matrix;
 	HashTable table;
-
 
 	// Number of elements, size of sparse discretized space, dimension of features width and height
 	int N_, M_, d_, w_, h_;
@@ -131,4 +130,3 @@ public:
 }; // class ModifiedPermutohedral
 }//namespace caffe
 #endif //CAFFE_MODIFIED_PERMUTOHEDRAL_HPP_
-

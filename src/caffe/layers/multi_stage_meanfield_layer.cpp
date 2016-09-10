@@ -12,14 +12,14 @@
  *
  *             For more information about CRF-RNN, please visit the project website http://crfasrnn.torr.vision.
  */
+#include <cmath>
 #include <vector>
-#include <boost/lexical_cast.hpp>
-#include <boost/scoped_ptr.hpp>
 
 #include "caffe/filler.hpp"
 #include "caffe/layer.hpp"
-#include "caffe/util/im2col.hpp"
 #include "caffe/layers/multi_stage_meanfield_layer.hpp"
+#include "caffe/util/im2col.hpp"
+#include "caffe/util/math_functions.hpp"
 #include "caffe/util/tvg_common_utils.hpp"
 
 namespace caffe {
@@ -91,10 +91,7 @@ void MultiStageMeanfieldLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bot
   split_layer_.reset(new SplitLayer<Dtype>(split_layer_param));
   split_layer_->SetUp(split_layer_bottom_vec_, split_layer_top_vec_);
 
-
-
   unary_prob_.Reshape(num_, channels_, height_, width_);
-
 
   // Make blobs store outputs of each meanfield iteration. Output of the last iteration is stored in top[0].
   // So we need only (num_iterations_ - 1) blobs.
@@ -106,7 +103,7 @@ void MultiStageMeanfieldLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bot
   // Make instances of MeanfieldIteration and initialize them.
   meanfield_iterations_.resize(num_iterations_);
   for (int i = 0; i < num_iterations_; ++i) {
-    meanfield_iterations_[i].reset(new MeanfieldIteration<Dtype>(this));
+    meanfield_iterations_[i].reset(new MeanfieldIteration<Dtype>());
     meanfield_iterations_[i]->OneTimeSetUp(
         split_layer_out_blobs_[i].get(), // unary terms
         (i == 0) ? bottom[1] : iteration_output_blobs_[i - 1].get(), // softmax input
@@ -123,14 +120,14 @@ void MultiStageMeanfieldLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bot
 template <typename Dtype>
 void MultiStageMeanfieldLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
-	// Do nothing.
+  // Do nothing.
 }
 
 /**
  * Performs filter-based mean field inference given the image and unaries.
  *
  * bottom[0] - Unary terms
- * bottom[1] - Softmax input (a copy of the unary terms)
+ * bottom[1] - Softmax input/Output from the previous iteration (a copy of the unary terms if this is the first stage).
  * bottom[2] - RGB images
  *
  * top[0] - Output of the mean field inference (not normalized).
@@ -139,31 +136,31 @@ template <typename Dtype>
 void MultiStageMeanfieldLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
 
-
   split_layer_bottom_vec_[0] = bottom[0];
   split_layer_->Forward(split_layer_bottom_vec_, split_layer_top_vec_);
 
-  // Initialize the bilateral lattice.
+  // Initialize the bilateral lattices.
   bilateral_lattices_.resize(num_);
   for (int n = 0; n < num_; ++n) {
-    compute_bilateral_kernel(bottom[2], n, bilateral_kernel_buffer_); // only batch_size = 1 is supported
+
+    compute_bilateral_kernel(bottom[2], n, bilateral_kernel_buffer_);
     bilateral_lattices_[n].reset(new ModifiedPermutohedral());
-    bilateral_lattices_[n]->init(bilateral_kernel_buffer_, 5, width_, height_);
+    bilateral_lattices_[n]->init(bilateral_kernel_buffer_, 5, num_pixels_);
 
     // Calculate bilateral filter normalization factors.
-    Dtype *norm_output_data = bilateral_norms_.mutable_cpu_data() + bilateral_norms_.offset(n);
-    bilateral_lattices_[n]->compute_cpu(norm_output_data, norm_feed_, 1);
+    Dtype* norm_output_data = bilateral_norms_.mutable_cpu_data() + bilateral_norms_.offset(n);
+    bilateral_lattices_[n]->compute(norm_output_data, norm_feed_, 1);
     for (int i = 0; i < num_pixels_; ++i) {
       norm_output_data[i] = 1.0f / (norm_output_data[i] + 1e-20f);
     }
   }
+
   for (int i = 0; i < num_iterations_; ++i) {
 
     meanfield_iterations_[i]->PrePass(this->blobs_, &bilateral_lattices_, &bilateral_norms_);
 
     meanfield_iterations_[i]->Forward_cpu();
   }
-
 }
 
 /**
@@ -173,7 +170,6 @@ template<typename Dtype>
 void MultiStageMeanfieldLayer<Dtype>::Backward_cpu(
     const vector<Blob<Dtype>*>& top, const vector<bool>& propagate_down,
     const vector<Blob<Dtype>*>& bottom) {
-
 
   for (int i = (num_iterations_ - 1); i >= 0; --i) {
     meanfield_iterations_[i]->Backward_cpu();
@@ -199,7 +195,16 @@ void MultiStageMeanfieldLayer<Dtype>::Backward_cpu(
   }
 }
 
-// TODO: A GPU version of this kernel computation
+// TODO: A GPU version of these kernel computations
+template <typename Dtype>
+void MultiStageMeanfieldLayer<Dtype>::compute_spatial_kernel(float* const output_kernel) {
+
+  for (int p = 0; p < num_pixels_; ++p) {
+    output_kernel[2*p] = static_cast<float>(p % width_) / theta_gamma_;
+    output_kernel[2*p + 1] = static_cast<float>(p / width_) / theta_gamma_;
+  }
+}
+
 template<typename Dtype>
 void MultiStageMeanfieldLayer<Dtype>::compute_bilateral_kernel(const Blob<Dtype>* const rgb_blob, const int n,
                                                                float* const output_kernel) {
@@ -212,15 +217,6 @@ void MultiStageMeanfieldLayer<Dtype>::compute_bilateral_kernel(const Blob<Dtype>
     output_kernel[5 * p + 2] = static_cast<float>(rgb_data_start[p] / theta_beta_);
     output_kernel[5 * p + 3] = static_cast<float>((rgb_data_start + num_pixels_)[p] / theta_beta_);
     output_kernel[5 * p + 4] = static_cast<float>((rgb_data_start + num_pixels_ * 2)[p] / theta_beta_);
-  }
-}
-
-template <typename Dtype>
-void MultiStageMeanfieldLayer<Dtype>::compute_spatial_kernel(float* const output_kernel) {
-
-  for (int p = 0; p < num_pixels_; ++p) {
-    output_kernel[2*p] = static_cast<float>(p % width_) / theta_gamma_;
-    output_kernel[2*p + 1] = static_cast<float>(p / width_) / theta_gamma_;
   }
 }
 
@@ -252,7 +248,7 @@ void MultiStageMeanfieldLayer<Dtype>::init_param_blobs(const MultiStageMeanfield
 }
 
 template <typename Dtype>
-void MultiStageMeanfieldLayer<Dtype>::init_spatial_lattice(void) {
+void MultiStageMeanfieldLayer<Dtype>::init_spatial_lattice() {
 
   // This should be done on GPU if the GPU is available.
   // Right now, the spatial kernel is computed on CPU, then transferred over to the GPU
@@ -301,7 +297,7 @@ void MultiStageMeanfieldLayer<Dtype>::init_spatial_lattice(void) {
 }
 
 template<typename Dtype>
-void MultiStageMeanfieldLayer<Dtype>::init_bilateral_buffers(void) {
+void MultiStageMeanfieldLayer<Dtype>::init_bilateral_buffers() {
 
   if (init_cpu_) {
     bilateral_kernel_buffer_ = new float[5 * num_pixels_];
@@ -329,7 +325,6 @@ MultiStageMeanfieldLayer<Dtype>::~MultiStageMeanfieldLayer(){
   }
 #endif
 }
-
 
 INSTANTIATE_CLASS(MultiStageMeanfieldLayer);
 REGISTER_LAYER_CLASS(MultiStageMeanfield);
