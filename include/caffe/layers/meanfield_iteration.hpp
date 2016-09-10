@@ -21,14 +21,11 @@ namespace caffe {
     class MeanfieldIteration {
 
     public:
-
-        bool is_first_iteration_; // TODO: a nasty hack, fix later.
-
         /**
          * Every MeanfieldIteration must belong to a {@link MultiStageMeanfieldLayer}.
          */
         explicit MeanfieldIteration(MultiStageMeanfieldLayer<Dtype> * const msmf_parent) :
-                is_first_iteration_(false), msmf_parent_(msmf_parent) { }
+                msmf_parent_(msmf_parent) { }
 
         /**
          * Must be invoked only once after the construction of the layer.
@@ -66,7 +63,6 @@ namespace caffe {
         }
 
     private:
-
         vector<shared_ptr<Blob<Dtype> > > blobs_;
 
         MultiStageMeanfieldLayer<Dtype> * const msmf_parent_;
@@ -95,7 +91,6 @@ namespace caffe {
         const vector<shared_ptr<ModifiedPermutohedral> > * bilateral_lattices_;
         const Blob<Dtype>* spatial_norm_;
         const Blob<Dtype>* bilateral_norms_;
-
     };
 
 }//namespace caffe

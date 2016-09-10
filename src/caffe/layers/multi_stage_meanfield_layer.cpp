@@ -14,11 +14,12 @@
  */
 #include <vector>
 #include <boost/lexical_cast.hpp>
+#include <boost/scoped_ptr.hpp>
 
 #include "caffe/filler.hpp"
 #include "caffe/layer.hpp"
 #include "caffe/util/im2col.hpp"
-#include "caffe/layers/meanfield_layers.hpp"
+#include "caffe/layers/multi_stage_meanfield_layer.hpp"
 #include "caffe/util/tvg_common_utils.hpp"
 
 namespace caffe {
@@ -113,7 +114,6 @@ void MultiStageMeanfieldLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bot
         spatial_lattice_, // spatial lattice
         &spatial_norm_); // spatial normalization factors.
   }
-  meanfield_iterations_[0]->is_first_iteration_ = true; // TODO: a nasty hack. Fix later.
 
   this->param_propagate_down_.resize(this->blobs_.size(), true);
 
@@ -146,17 +146,17 @@ void MultiStageMeanfieldLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bo
   // Initialize the bilateral lattice.
   bilateral_lattices_.resize(num_);
   for (int n = 0; n < num_; ++n) {
-  compute_bilateral_kernel(bottom[2], n, bilateral_kernel_buffer_); // only batch_size = 1 is supported
-  bilateral_lattices_[n].reset(new ModifiedPermutohedral());
-  bilateral_lattices_[n]->init(bilateral_kernel_buffer_, 5, width_, height_);
+    compute_bilateral_kernel(bottom[2], n, bilateral_kernel_buffer_); // only batch_size = 1 is supported
+    bilateral_lattices_[n].reset(new ModifiedPermutohedral());
+    bilateral_lattices_[n]->init(bilateral_kernel_buffer_, 5, width_, height_);
 
-  // Calculate bilateral filter normalization factors.
-  Dtype *norm_output_data = bilateral_norms_.mutable_cpu_data() + bilateral_norms_.offset(n);
-  bilateral_lattices_[n]->compute_cpu(norm_output_data, norm_feed_, 1);
-  for (int i = 0; i < num_pixels_; ++i) {
-    norm_output_data[i] = 1.f / (norm_output_data[i] + 1e-20f);
+    // Calculate bilateral filter normalization factors.
+    Dtype *norm_output_data = bilateral_norms_.mutable_cpu_data() + bilateral_norms_.offset(n);
+    bilateral_lattices_[n]->compute_cpu(norm_output_data, norm_feed_, 1);
+    for (int i = 0; i < num_pixels_; ++i) {
+      norm_output_data[i] = 1.0f / (norm_output_data[i] + 1e-20f);
+    }
   }
- }
   for (int i = 0; i < num_iterations_; ++i) {
 
     meanfield_iterations_[i]->PrePass(this->blobs_, &bilateral_lattices_, &bilateral_norms_);
@@ -193,7 +193,7 @@ void MultiStageMeanfieldLayer<Dtype>::Backward_cpu(
 
       for (int i = 0; i < num_iterations_; ++i) {
         const Dtype* diffs_to_add = meanfield_iterations_[i]->blobs()[blob_id]->cpu_diff();
-        caffe_axpy(cur_blob->count(), Dtype(1.), diffs_to_add, cur_blob->mutable_cpu_diff());
+        caffe_axpy(cur_blob->count(), Dtype(1.0), diffs_to_add, cur_blob->mutable_cpu_diff());
       }
     }
   }
@@ -229,7 +229,7 @@ void MultiStageMeanfieldLayer<Dtype>::init_param_blobs(const MultiStageMeanfield
 
   // blobs_[0] - spatial kernel weights
   // blobs_[1] - bilateral kernel weights
-  // blobs_[2] - compatability matrix
+  // blobs_[2] - compatibility matrix
   this->blobs_.resize(3);
 
   // Allocate space for kernel weights.
@@ -242,11 +242,11 @@ void MultiStageMeanfieldLayer<Dtype>::init_param_blobs(const MultiStageMeanfield
 
   // Initialize the compatibility matrix.
   this->blobs_[2].reset(new Blob<Dtype>(1, 1, channels_, channels_));
-  caffe_set(channels_ * channels_, Dtype(0.), this->blobs_[2]->mutable_cpu_data());
+  caffe_set(channels_ * channels_, Dtype(0.0), this->blobs_[2]->mutable_cpu_data());
 
   // Initialize it to have the Potts model.
   for (int c = 0; c < channels_; ++c) {
-    (this->blobs_[2]->mutable_cpu_data())[c * channels_ + c] = Dtype(-1.);
+    (this->blobs_[2]->mutable_cpu_data())[c * channels_ + c] = Dtype(-1.0);
   }
 
 }
