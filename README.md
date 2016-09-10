@@ -1,6 +1,7 @@
-# Caffe upstream for CRF-RNN
+# Caffe implementation of CRF-RNN
 
-[![Build Status](https://travis-ci.org/BVLC/caffe.svg?branch=master)](https://travis-ci.org/BVLC/caffe)
+This is a fork of [CRF-RNN](https://github.com/bittnt/caffe)
+
 [![License](https://img.shields.io/badge/license-BSD-blue.svg)](LICENSE)
 
 Caffe is a deep learning framework made with expression, speed, and modularity in mind.
