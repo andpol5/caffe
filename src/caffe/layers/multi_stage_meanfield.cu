@@ -17,7 +17,7 @@
 #include "caffe/filler.hpp"
 #include "caffe/layer.hpp"
 #include "caffe/util/im2col.hpp"
-#include "caffe/layers/meanfield_layers.hpp"
+#include "caffe/layers/multi_stage_meanfield_layer.hpp"
 
 namespace caffe {
 

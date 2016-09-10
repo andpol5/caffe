@@ -72,6 +72,7 @@ TYPED_TEST(MultiStageMeanfieldLayerTest, TestGradient) {
 
   LayerParameter layer_param2;
   MultiStageMeanfieldParameter* ms_mf_param = layer_param2.mutable_multi_stage_meanfield_param();
+  ms_mf_param->set_force_cpu(true);
   ms_mf_param->set_num_iterations(2);
   ms_mf_param->set_bilateral_filter_weights_str("1.0 1.0 1.0 1.0 2.0");
   ms_mf_param->set_spatial_filter_weights_str("2.0 2.0 2.0 2.0 3.0");
