@@ -12,6 +12,7 @@
  *
  *             For more information about CRF-RNN, please visit the project website http://crfasrnn.torr.vision.
  */
+#include <cmath>
 #include <vector>
 
 #include "caffe/filler.hpp"

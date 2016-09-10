@@ -139,4 +139,3 @@ void MultiStageMeanfieldLayer<Dtype>::Backward_gpu(
 INSTANTIATE_LAYER_GPU_FUNCS(MultiStageMeanfieldLayer);
 
 }  // namespace caffe
-
