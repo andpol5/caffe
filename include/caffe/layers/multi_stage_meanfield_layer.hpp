@@ -46,6 +46,7 @@ protected:
   virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
 
+private:
   void compute_spatial_kernel(float* const output_kernel);
   void compute_bilateral_kernel(const Blob<Dtype>* const rgb_blob, const int n, float* const output_kernel);
   void init_param_blobs(const MultiStageMeanfieldParameter& meanfield_param);
@@ -92,6 +93,6 @@ protected:
   bool init_cpu_;
   bool init_gpu_;
 };
-}
+} //namespace caffe
 
 #endif
