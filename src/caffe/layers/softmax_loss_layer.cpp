@@ -5,6 +5,10 @@
 #include "caffe/layers/softmax_loss_layer.hpp"
 #include "caffe/util/math_functions.hpp"
 
+namespace{
+  const float MIN_GRADIENT = 1e-10;
+}
+
 namespace caffe {
 
 template <typename Dtype>
@@ -108,7 +112,14 @@ void SoftmaxWithLossLayer<Dtype>::Forward_cpu(
       ++count;
     }
   }
-  top[0]->mutable_cpu_data()[0] = loss / get_normalizer(normalization_, count);
+  // Cut off loss when close to zero
+  Dtype norm = get_normalizer(normalization_, count);
+  if (norm < static_cast<Dtype>(MIN_GRADIENT)) {
+    loss = 0;
+  } else {
+    loss = loss / norm;
+  }
+  top[0]->mutable_cpu_data()[0] = loss;
   if (top.size() == 2) {
     top[1]->ShareData(prob_);
   }
@@ -142,9 +153,11 @@ void SoftmaxWithLossLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
       }
     }
     // Scale gradient
-    Dtype loss_weight = top[0]->cpu_diff()[0] /
-                        get_normalizer(normalization_, count);
-    caffe_scal(prob_.count(), loss_weight, bottom_diff);
+    Dtype norm = get_normalizer(normalization_, count);
+    if (norm > static_cast<Dtype>(MIN_GRADIENT)) {
+      Dtype loss_weight = top[0]->cpu_diff()[0] / norm;
+      caffe_scal(prob_.count(), loss_weight, bottom_diff);
+    }
   }
 }
 
