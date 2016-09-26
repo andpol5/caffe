@@ -14,16 +14,16 @@ class LspBatchDataLayer(caffe.Layer):
     def setup(self, bottom, top):
         """
         Initialize the data layer from given parameters
-        
+
         dir: base dir of images, labels, and input files
         input: file with the names of the images
         label: file with the names of the label files
         mean: mean value to subtract from images
         randomize: randomize the training/test set
         seed: seed for randomization
-        
+
         """
-        
+
         # configure the data layer
         params = eval(self.param_str)
         self.dir = params['dir']
@@ -39,7 +39,7 @@ class LspBatchDataLayer(caffe.Layer):
         # data layers have no bottoms
         if len(bottom) != 0:
             raise Exception("Do not define a bottom.")
-        
+
         # load images and label names, both need to have the right order
         self.images = open(os.path.join(self.dir, self.image_file), 'r').read().splitlines()
         self.labels = open(os.path.join(self.dir, self.label_file), 'r').read().splitlines()
@@ -51,28 +51,28 @@ class LspBatchDataLayer(caffe.Layer):
             self.indices = rnd.permutation(len(self.images))
         else:
             self.indices = np.arange(len(self.images))
-    
+
     def reshape(self, bottom, top):
         # load image, label and matrix
         self.data = self.load_image(self.images[self.indices[self.idx]])
         self.label = self.load_label(self.labels[self.indices[self.idx]])
-	
+
         #L = 7
         #SIZE = 451
         #H = np.ones((SIZE, SIZE))
-	#H = np.eye(L, dtype = 'f4') 
+        #H = np.eye(L, dtype = 'f4') 
         #counts = np.bincount(self.label.flat)
         #w_counts = [float(c / float(SIZE * SIZE)) for c in counts]
         #weights_counts = np.array(w_counts) / sum(w_counts)
-	
-	#for x in xrange(L):
-		#H[x, x] = weights_counts[x]
-	
-	#self.score = H.reshape( (1, 1, SIZE, SIZE))
 
-	top[0].reshape(1, *self.data.shape)
+        #for x in xrange(L):
+            #H[x, x] = weights_counts[x]
+
+        #self.score = H.reshape( (1, 1, SIZE, SIZE))
+
+        top[0].reshape(1, *self.data.shape)
         top[1].reshape(1, *self.label.shape)
-   	#top[2].reshape(1, *self.score.shape) 
+        #top[2].reshape(1, *self.score.shape) 
 
     def forward(self, bottom, top):
         top[0].data[...] = self.data
@@ -90,7 +90,7 @@ class LspBatchDataLayer(caffe.Layer):
     def backward(self, top, propagate_down, bottom):
         # nothing to do here
         pass
-    
+
     def load_image(self, name):
         img = Image.open(name)
         img = np.array(img, dtype=np.float32)
@@ -102,7 +102,7 @@ class LspBatchDataLayer(caffe.Layer):
         img = np.repeat(img, SCALES, axis=0)
         # size should now be 12x451x451
         return img
-    
+
     def load_label(self, name):
         label = Image.open(name)
         label = np.array(label, dtype=np.uint8)
