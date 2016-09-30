@@ -43,6 +43,8 @@ class ImageLabelDataLayer : public BasePrefetchingDataLayer<Dtype> {
 
   int batch_size_;
   int crop_size_;
+  int image_padding_value_;
+  int label_padding_value_;
 
   std::string image_dir_;
   std::string label_dir_;

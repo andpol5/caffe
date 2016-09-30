@@ -853,7 +853,7 @@ message ImageLabelDataParameter {
     REFLECT = 1;
   }
 
-  optional Padding padding = 8 [default = REFLECT];
+  optional Padding padding = 9 [default = REFLECT];
 }
 
 message InfogainLossParameter {
