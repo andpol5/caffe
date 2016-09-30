@@ -37,10 +37,10 @@ namespace{
     }
     cv::Mat big_image;
     if (value < 0) {
-      cv::copyMakeBorder(image, big_image, top, bottom, right, left,
+      cv::copyMakeBorder(image, big_image, top, bottom, left, right,
                          cv::BORDER_REFLECT_101);
     } else {
-      cv::copyMakeBorder(image, big_image, top, bottom, right, left,
+      cv::copyMakeBorder(image, big_image, top, bottom, left, right,
                          cv::BORDER_CONSTANT, cv::Scalar(value));
     }
     return big_image;
@@ -71,6 +71,18 @@ void ImageLabelDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bott
   image_dir_ = data_param.image_dir();
   label_dir_ = data_param.label_dir();
   batch_size_ = data_param.batch_size();
+  label_padding_value_ = data_param.label_background_value();
+
+  switch (data_param.padding()) {
+    case ImageLabelDataParameter_Padding_ZERO:
+      image_padding_value_ = 0;
+      break;
+    case ImageLabelDataParameter_Padding_REFLECT:
+      image_padding_value_ = -1;
+      break;
+    default:
+      LOG(FATAL) << "Unknown Padding";
+  }
 
   crop_size_ = -1;
   auto transform_param = this->layer_param_.transform_param();
@@ -122,10 +134,12 @@ void ImageLabelDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bott
   }
   // Read an image, and use it to initialize the top blob.
   cv::Mat cv_img = ReadImageToCVMat(image_dir_ + lines_[lines_id_].first);
+  cv_img = PadImage(cv_img, crop_size_, image_padding_value_);
   CHECK(cv_img.data) << "Could not load " << lines_[lines_id_].first;
 
   // Read a label, and use it to initialize the label top blob.
   cv::Mat cv_label = ReadImageToCVMat(label_dir_ + lines_[lines_id_].second, NOT_COLOR_IMAGE);
+  cv_label = PadImage(cv_label, crop_size_, label_padding_value_);
   CHECK(cv_label.data) << "Could not load " << lines_[lines_id_].second;
 
   // Use data_transformer to infer the expected blob shape from a cv_image.
@@ -170,7 +184,7 @@ void ImageLabelDataLayer<Dtype>::load_batch(Batch<Dtype>* batch) {
   double read_time = 0;
   double trans_time = 0;
   CPUTimer timer;
-  auto& data_param = this->layer_param_.image_label_data_param();
+//  auto& data_param = this->layer_param_.image_label_data_param();
   CHECK(batch->data_.count());
   CHECK(this->transformed_data_.count());
 
@@ -196,17 +210,8 @@ void ImageLabelDataLayer<Dtype>::load_batch(Batch<Dtype>* batch) {
     CHECK(cv_img.data) << "Could not load " << lines_[lines_id_].first;
     CHECK(cv_label.data) << "Could not load " << lines_[lines_id_].second;
 
-    switch (data_param.padding()) {
-      case ImageLabelDataParameter_Padding_ZERO:
-        cv_img = PadImage(cv_img, crop_size_, 0);
-        break;
-      case ImageLabelDataParameter_Padding_REFLECT:
-        cv_img = PadImage(cv_img, crop_size_, -1);
-        break;
-      default:
-        LOG(FATAL) << "Unknown Padding";
-    }
-    cv_label = PadImage(cv_label, crop_size_, data_param.label_background_value());
+    cv_img = PadImage(cv_img, crop_size_, image_padding_value_);
+    cv_label = PadImage(cv_label, crop_size_, label_padding_value_);
 
     read_time += timer.MicroSeconds();
     timer.Start();
