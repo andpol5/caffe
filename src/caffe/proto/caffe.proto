@@ -406,6 +406,7 @@ message LayerParameter {
   optional WindowDataParameter window_data_param = 129;
   optional MultiStageMeanfieldParameter multi_stage_meanfield_param = 1000;
   optional ImageLabelDataParameter image_label_data_param = 1001;
+  optional FyuImageLabelDataParameter fyu_image_label_data_param = 1005;
 }
 
 // Message that stores parameters used to apply transformation
@@ -856,6 +857,39 @@ message ImageLabelDataParameter {
   optional Padding padding = 9 [default = REFLECT];
 }
 
+message FyuImageLabelDataParameter {
+  // Specify the data source.
+  optional string image_list_path = 1;
+  optional string label_list_path = 2;
+  // Specify the batch size.
+  optional uint32 batch_size = 3 [default = 1];
+  // The rand_skip variable is for the data layer to skip a few data points
+  // to avoid all asynchronous sgd clients to start at the same point. The skip
+  // point would be set as rand_skip * rand(0,1). Note that rand_skip should not
+  // be larger than the number of keys in the database.
+  optional uint32 rand_skip = 4 [default = 0];
+  // Whether or not ImageLayer should shuffle the list of files at every epoch.
+  optional bool shuffle = 5 [default = false];
+
+  // Whether random sample image scales
+  optional bool rand_scale = 6 [default = false];
+  optional float min_scale = 7  [default = 1];
+  optional float max_scale = 8  [default = 1];
+
+  optional string data_dir = 9 [default = ""];
+
+  optional Slice label_slice = 10;
+
+  optional string image_dir = 11 [default = ""];
+  optional string label_dir = 12 [default = ""];
+
+  enum Padding {
+    ZERO = 0;
+    REFLECT = 1;
+  }
+
+  optional Padding padding = 13 [default = REFLECT];
+}
 message InfogainLossParameter {
   // Specify the infogain matrix source.
   optional string source = 1;
