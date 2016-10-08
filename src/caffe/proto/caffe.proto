@@ -407,6 +407,7 @@ message LayerParameter {
   optional MultiStageMeanfieldParameter multi_stage_meanfield_param = 1000;
   optional ImageLabelDataParameter image_label_data_param = 1001;
   optional FyuImageLabelDataParameter fyu_image_label_data_param = 1005;
+  optional WeightedLossParameter weighted_loss_param = 1006;
 }
 
 // Message that stores parameters used to apply transformation
@@ -846,7 +847,7 @@ message ImageLabelDataParameter {
   optional string label_dir = 7 [default = ""];
 
   // Label background value
-  optional uint32 label_background_value = 8 [default = 255];
+  optional int32 label_background_value = 8 [default = 255];
 
   // How to pad the image up to the crop size
   enum Padding {
@@ -890,6 +891,14 @@ message FyuImageLabelDataParameter {
 
   optional Padding padding = 13 [default = REFLECT];
 }
+
+message WeightedLossParameter {
+  // Specify the label values present in the ground truth
+  repeated int32 pixel_label = 1;
+  // If specified, ignore instances with the given label.
+  optional int32 ignore_label = 2;
+}
+
 message InfogainLossParameter {
   // Specify the infogain matrix source.
   optional string source = 1;

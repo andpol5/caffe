@@ -46,19 +46,11 @@ class SoftmaxWithWeightedLossLayer : public LossLayer<Dtype> {
 //  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
 //      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
 
-  // Read the normalization mode parameter and compute the normalizer based
-  // on the blob size.  If normalization_mode is VALID, the count of valid
-  // outputs will be read from valid_count, unless it is -1 in which case
-  // all outputs are assumed to be valid.
-  virtual Dtype get_normalizer(
-      LossParameter_NormalizationMode normalization_mode, int valid_count);
-
   virtual void recalculate_pixel_weights(const Blob<Dtype>& label);
 
   // The internal SoftmaxLayer used to map predictions to a distribution.
   shared_ptr<Layer<Dtype> > softmax_layer_;
-  // Calculate pixel weights based on counts - recalculated on every iteration
-  Blob<Dtype> pixel_weights_;
+
   // prob stores the output probability predictions from the SoftmaxLayer.
   Blob<Dtype> prob_;
   // bottom vector holder used in call to the underlying SoftmaxLayer::Forward
@@ -73,6 +65,11 @@ class SoftmaxWithWeightedLossLayer : public LossLayer<Dtype> {
   LossParameter_NormalizationMode normalization_;
 
   int softmax_axis_, outer_num_, inner_num_;
+
+  // Calculate pixel weights based on counts - recalculated on every iteration
+  Blob<Dtype> pixel_weights_;
+  // The pixel values (ground truth) present in the label data
+  std::vector<int> class_labels_;
 };
 
 }  // namespace caffe
