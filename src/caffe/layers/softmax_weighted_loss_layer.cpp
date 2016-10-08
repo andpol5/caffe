@@ -6,9 +6,13 @@
 #include "caffe/util/math_functions.hpp"
 
 namespace{
-  const float MIN_GRADIENT = 1e-10;
-  // TODO: generalize this into a parameter
-  const std::vector<int> CLASS_LABELS = {0, 1};
+  const float MIN_VALUE = 1e-15f;
+
+  std::string ints_to_string(const std::vector<int>& vec){
+    std::stringstream result;
+    std::copy(vec.begin(), vec.end(), std::ostream_iterator<int>(result, " "));
+    return result.str();
+  }
 }
 
 namespace caffe {
@@ -17,7 +21,7 @@ template <typename Dtype>
 void SoftmaxWithWeightedLossLayer<Dtype>::LayerSetUp(
     const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
   LossLayer<Dtype>::LayerSetUp(bottom, top);
-  LayerParameter softmax_param(this->layer_param_);
+  auto& softmax_param = this->layer_param_;
   softmax_param.set_type("Softmax");
   softmax_layer_ = LayerRegistry<Dtype>::CreateLayer(softmax_param);
   softmax_bottom_vec_.clear();
@@ -26,19 +30,20 @@ void SoftmaxWithWeightedLossLayer<Dtype>::LayerSetUp(
   softmax_top_vec_.push_back(&prob_);
   softmax_layer_->SetUp(softmax_bottom_vec_, softmax_top_vec_);
 
-  has_ignore_label_ =
-    this->layer_param_.loss_param().has_ignore_label();
+  auto& weighted_loss_param = this->layer_param_.weighted_loss_param();
+  has_ignore_label_ = weighted_loss_param.has_ignore_label();
   if (has_ignore_label_) {
-    ignore_label_ = this->layer_param_.loss_param().ignore_label();
+    ignore_label_ = weighted_loss_param.ignore_label();
   }
-  if (!this->layer_param_.loss_param().has_normalization() &&
-      this->layer_param_.loss_param().has_normalize()) {
-    normalization_ = this->layer_param_.loss_param().normalize() ?
-                     LossParameter_NormalizationMode_VALID :
-                     LossParameter_NormalizationMode_BATCH_SIZE;
-  } else {
-    normalization_ = this->layer_param_.loss_param().normalization();
+
+  class_labels_.clear();
+  int pixel_label_size = weighted_loss_param.pixel_label_size();
+  class_labels_.resize(pixel_label_size);
+  for(int i = 0; i < weighted_loss_param.pixel_label_size(); i++){
+    class_labels_[i] = weighted_loss_param.pixel_label(i);
   }
+  LOG(INFO) << " Ground truth labels: " << ints_to_string(class_labels_);
+
   const vector<int>& labelShape = bottom[1]->shape();
   pixel_weights_.Reshape(labelShape);
 }
@@ -48,24 +53,37 @@ void  SoftmaxWithWeightedLossLayer<Dtype>::recalculate_pixel_weights(const Blob<
   // Zero out the weights blob
   caffe_set<Dtype>(pixel_weights_.count(), static_cast<Dtype>(0), pixel_weights_.mutable_cpu_data());
 
-  // Since there are only 2 labels: 0-background and 1-data, we can just sum (count) the data
-  Dtype label_count = label.asum_data();
-  Dtype background_count = label.count() - label_count;
+  // Count up the number of times each label value is present in the image
+  // and divide 1 by the count. If a label is rare it should be weighted higher within the loss function
 
-  Dtype label_weight = static_cast<Dtype>(1.0 / label_count);
-  Dtype background_weight = static_cast<Dtype>(1.0 / background_count);
+  // Analyze each element in the batch separately and build a lookup table for each batch element
+  vector<std::map<int, Dtype> > label_weight_luts;
+  for (int i = 0; i < outer_num_; ++i) {
+    std::map<int, Dtype> label_weight_lut;
+    for(vector<int>::const_iterator j = class_labels_.begin(); j != class_labels_.end(); ++j){
+      // Find all instances of this label value within this element in the batch
+      const Dtype label_value = static_cast<Dtype>(*j);
+      const Dtype* begin_ptr = label.cpu_data() + (i*inner_num_);
+      const Dtype* end_ptr = label.cpu_data() + (i+1)*inner_num_;
 
+      int label_count = std::count(begin_ptr, end_ptr, label_value);
+      if(label_count > 0){
+        label_weight_lut[*j] = static_cast<Dtype>(1.0 / label_count);
+      }
+      else{
+        label_weight_lut[*j] = static_cast<Dtype>(1.0);
+      }
+    }
+    label_weight_luts.push_back(label_weight_lut);
+  }
   const Dtype* label_ptr = label.cpu_data();
   Dtype* weight_ptr = pixel_weights_.mutable_cpu_data();
   for (int i = 0; i < outer_num_; ++i) {
     for (int j = 0; j < inner_num_; j++) {
+      // Label at this pixel
       const int label_value = static_cast<int>(label_ptr[i * inner_num_ + j]);
-      if(label_value == 0){
-        weight_ptr[i * inner_num_ + j] = background_weight;
-      }
-      else{
-        weight_ptr[i * inner_num_ + j] = label_weight;
-      }
+      // Weight for this label
+      weight_ptr[i * inner_num_ + j] = label_weight_luts[i][label_value];
     }
   }
 }
@@ -92,36 +110,6 @@ void SoftmaxWithWeightedLossLayer<Dtype>::Reshape(
 }
 
 template <typename Dtype>
-Dtype SoftmaxWithWeightedLossLayer<Dtype>::get_normalizer(
-    LossParameter_NormalizationMode normalization_mode, int valid_count) {
-  Dtype normalizer;
-  switch (normalization_mode) {
-    case LossParameter_NormalizationMode_FULL:
-      normalizer = Dtype(outer_num_ * inner_num_);
-      break;
-    case LossParameter_NormalizationMode_VALID:
-      if (valid_count == -1) {
-        normalizer = Dtype(outer_num_ * inner_num_);
-      } else {
-        normalizer = Dtype(valid_count);
-      }
-      break;
-    case LossParameter_NormalizationMode_BATCH_SIZE:
-      normalizer = Dtype(outer_num_);
-      break;
-    case LossParameter_NormalizationMode_NONE:
-      normalizer = Dtype(1);
-      break;
-    default:
-      LOG(FATAL) << "Unknown normalization mode: "
-          << LossParameter_NormalizationMode_Name(normalization_mode);
-  }
-  // Some users will have no labels for some examples in order to 'turn off' a
-  // particular loss in a multi-task setup. The max prevents NaNs in that case.
-  return std::max(Dtype(1.0), normalizer);
-}
-
-template <typename Dtype>
 void SoftmaxWithWeightedLossLayer<Dtype>::Forward_cpu(
     const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
   // The forward pass computes the softmax prob values.
@@ -140,16 +128,12 @@ void SoftmaxWithWeightedLossLayer<Dtype>::Forward_cpu(
       }
       DCHECK_GE(label_value, 0);
       DCHECK_LT(label_value, prob_.shape(softmax_axis_));
-      loss -= weight[i * inner_num_ + j] * log(std::max(prob_data[i * dim + label_value * inner_num_ + j],
-                           static_cast<Dtype>(FLT_MIN)));
+
+      const Dtype& prob_value = prob_data[i * dim + label_value * inner_num_ + j];
+      loss -= weight[i * inner_num_ + j] * log(std::max(prob_value, static_cast<Dtype>(MIN_VALUE)));
     }
   }
-//  Dtype norm = get_normalizer(normalization_, count);
-//  if (norm < MIN_GRADIENT) {
-//    loss = 0;
-//  } else {
-//    loss = loss / norm;
-//  }
+
   top[0]->mutable_cpu_data()[0] = loss;
   if (top.size() == 2) {
     top[1]->ShareData(prob_);
@@ -187,12 +171,6 @@ void SoftmaxWithWeightedLossLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*
         }
       }
     }
-//    // Scale gradient
-//    Dtype norm = get_normalizer(normalization_, count);
-//    if (norm > static_cast<Dtype>(MIN_GRADIENT)) {
-//      Dtype loss_weight = top[0]->cpu_diff()[0] / norm;
-//      caffe_scal(prob_.count(), loss_weight, bottom_diff);
-//    }
   }
 }
 
