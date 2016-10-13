@@ -220,7 +220,7 @@ message SolverParameter {
 
   // RMSProp decay value
   // MeanSquare(t) = rms_decay*MeanSquare(t-1) + (1-rms_decay)*SquareGradient(t)
-  optional float rms_decay = 38;
+  optional float rms_decay = 388 [default = 0.99];
 
   // If true, print information about the state of the net that may help with
   // debugging learning problems.
@@ -404,6 +404,19 @@ message LayerParameter {
   optional ThresholdParameter threshold_param = 128;
   optional TileParameter tile_param = 138;
   optional WindowDataParameter window_data_param = 129;
+
+  // DeepLab Parameters
+  optional AdaptiveBiasChannelParameter adaptive_bias_channel_param = 2000;
+  optional BiasChannelParameter bias_channel_param = 2001;
+  optional DenseCRFParameter dense_crf_param = 2002;
+  optional DomainTransformParameter domain_transform_param = 2003;
+  optional InterpParameter interp_param = 2004;
+  optional MatReadParameter mat_read_param = 2005;
+  optional MatWriteParameter mat_write_param = 2006;
+  optional SegAccuracyParameter seg_accuracy_param = 2007;
+  optional UniqueLabelParameter unique_label_param = 2008;
+
+  // Dilation, CRF-RNN and other params
   optional MultiStageMeanfieldParameter multi_stage_meanfield_param = 1000;
   optional ImageLabelDataParameter image_label_data_param = 1001;
   optional FyuImageLabelDataParameter fyu_image_label_data_param = 1005;
@@ -431,6 +444,12 @@ message TransformationParameter {
   optional bool force_color = 6 [default = false];
   // Force the decoded image to have 1 color channels.
   optional bool force_gray = 7 [default = false];
+  // If we want to do data augmentation, Scaling factor for randomly scaling input images
+  repeated float scale_factors = 8;
+  // the width for cropped region
+  optional uint32 crop_width = 9 [default = 0];
+  // the height for cropped region
+  optional uint32 crop_height = 10 [default = 0];
 }
 
 // Message that stores parameters shared by loss layers
@@ -506,6 +525,14 @@ message AccuracyParameter {
   optional int32 ignore_label = 4;
 }
 
+message AdaptiveBiasChannelParameter {
+  optional int32 num_iter = 1 [default = 1];
+  optional float bg_portion = 2 [default = 0.2];
+  optional float fg_portion = 3 [default = 0.2];
+  optional bool suppress_others = 4 [default = true];
+  optional float margin_others = 5 [default = 1e-5];
+}
+
 message ArgMaxParameter {
   // If true produce pairs (argmax, maxval)
   optional bool out_max_val = 1 [default = false];
@@ -515,6 +542,22 @@ message ArgMaxParameter {
   // By default ArgMaxLayer maximizes over the flattened trailing dimensions
   // for each index of the first / num dimension.
   optional int32 axis = 3;
+}
+
+message BiasChannelParameter {
+  // Score biases. Separate values for BG / FG
+  optional float bg_bias = 1 [default = 1.];
+  optional float fg_bias = 2 [default = 2.];
+  // will ignore labels with this value when adding bias
+  repeated int32 ignore_label = 3;
+  enum LabelType {
+    IMAGE = 1;
+    PIXEL = 2;
+  }
+  optional LabelType label_type = 4 [default = IMAGE];
+  // If the dataset defines generic background label or not.
+  // The default value is defined for PASCAL VOC segmentation
+  optional int32 background_label = 6 [default = 0];
 }
 
 message ConcatParameter {
@@ -689,6 +732,31 @@ message DataParameter {
   optional uint32 prefetch = 10 [default = 4];
 }
 
+message DenseCRFParameter {
+  // max number of iteration for message passing
+  optional int32 max_iter = 1 [default = 10];
+  // positional std and weight for "Positional" filter (color-independent)
+  repeated float pos_xy_std = 2;
+  repeated float pos_w = 3;
+  // positional std, color std and weight for Bilateral filter
+  repeated float bi_xy_std = 4;
+  repeated float bi_rgb_std = 5;
+  repeated float bi_w = 6; 
+  // output is probability or score (score = log(prob))
+  optional bool output_probability = 7 [default = true];
+}
+
+message DomainTransformParameter {
+  // Max number of iteration for filtering.
+  optional int32 num_iter = 1 [default = 3];
+  // Standard deviation for spatial domain.
+  optional float spatial_sigma = 2 [default = 50];
+  // Standard deviation for range domain.
+  optional float range_sigma = 3 [default = 5];
+  // minimum weight value (to avoid zero gradient for ref_grad_data)
+  optional float min_weight = 4 [default = 0];
+}
+
 message DropoutParameter {
   optional float dropout_ratio = 1 [default = 0.5]; // dropout ratio
 }
@@ -827,6 +895,15 @@ message ImageDataParameter {
   // data.
   optional bool mirror = 6 [default = false];
   optional string root_folder = 12 [default = ""];
+  
+  // This is the value set for pixels or images where we don't know the label
+  optional int32 ignore_label = 13 [default = 255];
+  enum LabelType {
+    NONE = 0;
+    IMAGE = 1;
+    PIXEL = 2;
+  }
+  optional LabelType label_type = 14 [default = IMAGE];
 }
 
 message Slice {
@@ -935,6 +1012,15 @@ message InputParameter {
   repeated BlobShape shape = 1;
 }
 
+message InterpParameter {
+  optional int32 height = 1 [default = 0]; // Height of output
+  optional int32 width = 2 [default = 0]; // Width of output
+  optional int32 zoom_factor = 3 [default = 1]; // zoom factor
+  optional int32 shrink_factor = 4 [default = 1]; // shrink factor
+  optional int32 pad_beg = 5 [default = 0]; // padding at begin of input
+  optional int32 pad_end = 6 [default = 0]; // padding at end of input
+}
+
 // Message that stores parameters used by LogLayer
 message LogParameter {
   // LogLayer computes outputs y = log_base(shift + scale * x), for base > 0.
@@ -962,6 +1048,20 @@ message LRNParameter {
     CUDNN = 2;
   }
   optional Engine engine = 6 [default = DEFAULT];
+}
+
+message MatReadParameter {
+  required string prefix = 1;
+  optional string source = 2 [default = ""];
+  optional int32 strip = 3 [default = 0];
+  optional int32 batch_size = 4 [default = 1];
+}
+
+message MatWriteParameter {
+  required string prefix = 1;
+  optional string source = 2 [default = ""];
+  optional int32 strip = 3 [default = 0];
+  optional int32 period = 4 [default = 1];
 }
 
 message MemoryDataParameter {
@@ -1201,6 +1301,18 @@ message ScaleParameter {
   optional FillerParameter bias_filler = 5;
 }
 
+message SegAccuracyParameter {
+  enum AccuracyMetric {
+    PixelAccuracy = 0;
+    ClassAccuracy = 1;
+    PixelIOU = 2;
+  }
+  optional AccuracyMetric metric = 1 [default = PixelAccuracy];
+  // will ignore pixels with this value when computing accuracy
+  repeated int32 ignore_label = 2;
+  optional bool reset = 3 [default = true];
+}
+
 message SigmoidParameter {
   enum Engine {
     DEFAULT = 0;
@@ -1257,6 +1369,12 @@ message TileParameter {
 // Message that stores parameters used by ThresholdLayer
 message ThresholdParameter {
   optional float threshold = 1 [default = 0]; // Strictly positive values
+}
+
+message UniqueLabelParameter {
+  required int32 max_labels = 1;
+  repeated int32 ignore_label = 2;
+  repeated float force_label = 3;
 }
 
 message WindowDataParameter {
