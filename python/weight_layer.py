@@ -3,7 +3,7 @@ import numpy as np
 import scipy as sc
 
 
-class WeightLayerL(caffe.Layer):
+class WeightLayer(caffe.Layer):
     """
     Weight layer.
     """
@@ -31,4 +31,3 @@ class WeightLayerL(caffe.Layer):
     def reshape(self, bottom, top):
         top[0].reshape(*bottom[0].data.shape)
         pass
-

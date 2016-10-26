@@ -6,7 +6,19 @@
 #include "caffe/util/math_functions.hpp"
 
 namespace{
-  const float MIN_VALUE = 1e-15f;
+  const float MIN_VALUE = 1e-10f;
+
+  template <typename Dtype>
+  Dtype constrain_to_zero_one(const Dtype val){
+    Dtype min = static_cast<Dtype>(MIN_VALUE);
+    Dtype max = static_cast<Dtype>(1.0);
+    if(val < min)
+      return min;
+    else if(val > max)
+      return max;
+    else
+      return val;
+  }
 
   std::string ints_to_string(const std::vector<int>& vec){
     std::stringstream result;
@@ -129,8 +141,10 @@ void SoftmaxWithWeightedLossLayer<Dtype>::Forward_cpu(
       DCHECK_GE(label_value, 0);
       DCHECK_LT(label_value, prob_.shape(softmax_axis_));
 
-      const Dtype& prob_value = prob_data[i * dim + label_value * inner_num_ + j];
-      loss -= weight[i * inner_num_ + j] * log(std::max(prob_value, static_cast<Dtype>(MIN_VALUE)));
+      const Dtype prob_value = prob_data[i * dim + label_value * inner_num_ + j];
+      const Dtype constrained_value = constrain_to_zero_one(prob_value);
+      const Dtype log_value = std::log(constrained_value);
+      loss -= weight[i * inner_num_ + j]*log_value;
     }
   }
 
