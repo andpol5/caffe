@@ -72,6 +72,7 @@ class DropoutLayer : public NeuronLayer<Dtype> {
   Dtype threshold_;
   /// the scale for undropped inputs at train time @f$ 1 / (1 - p) @f$
   Dtype scale_;
+  bool scale_train_;
   unsigned int uint_thres_;
 };
 
