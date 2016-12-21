@@ -317,6 +317,8 @@ BOOST_PYTHON_MODULE(_caffe) {
         bp::return_internal_reference<>()))
     .add_property("layers", bp::make_function(&Net<Dtype>::layers,
         bp::return_internal_reference<>()))
+    .add_property("_mean_test_loss", bp::make_function(&Net<Dtype>::mean_test_loss,
+	bp::return_value_policy<bp::copy_const_reference>()))
     .add_property("_blob_names", bp::make_function(&Net<Dtype>::blob_names,
         bp::return_value_policy<bp::copy_const_reference>()))
     .add_property("_layer_names", bp::make_function(&Net<Dtype>::layer_names,

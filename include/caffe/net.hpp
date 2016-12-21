@@ -227,7 +227,10 @@ class Net {
   /// @brief return whether NetState state meets NetStateRule rule
   static bool StateMeetsRule(const NetState& state, const NetStateRule& rule,
       const string& layer_name);
-
+  inline const Dtype& mean_test_loss() const {
+    return mean_test_loss_;
+  }
+  Dtype mean_test_loss_;
  protected:
   // Helpers for Init.
   /// @brief Append a new top blob to the net.

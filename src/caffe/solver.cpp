@@ -201,15 +201,6 @@ void Solver<Dtype>::Step(int iters) {
   while (iter_ < stop_iter) {
     // zero-init the params
     net_->ClearParamDiffs();
-    if (param_.test_interval() && iter_ % param_.test_interval() == 0
-        && (iter_ > 0 || param_.test_initialization())
-        && Caffe::root_solver()) {
-      TestAll();
-      if (requested_early_exit_) {
-        // Break out of the while loop because stop was requested while testing.
-        break;
-      }
-    }
 
     for (int i = 0; i < callbacks_.size(); ++i) {
       callbacks_[i]->on_start();
@@ -255,6 +246,16 @@ void Solver<Dtype>::Step(int iters) {
     // Increment the internal iter_ counter -- its value should always indicate
     // the number of times the weights have been updated.
     ++iter_;
+
+    if (param_.test_interval() && iter_ % param_.test_interval() == 0
+        && (iter_ > 0 || param_.test_initialization())
+        && Caffe::root_solver()) {
+      TestAll();
+      if (requested_early_exit_) {
+        // Break out of the while loop because stop was requested while testing.
+        break;
+      }
+    }
 
     SolverAction::Enum request = GetRequestedAction();
 
@@ -400,6 +401,7 @@ void Solver<Dtype>::Test(const int test_net_id) {
     if (loss_weight) {
       loss_msg_stream << " (* " << loss_weight
                       << " = " << loss_weight * mean_score << " loss)";
+      test_net->mean_test_loss_ = mean_score;
     }
     LOG(INFO) << "    Test net output #" << i << ": " << output_name << " = "
               << mean_score << loss_msg_stream.str();
